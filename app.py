@@ -101,12 +101,13 @@ def process_activities(activities):
     # Conversion des types
     df['start_date'] = pd.to_datetime(df['start_date']).dt.tz_localize(None)  # Retirer le timezone
     df['distance_km'] = df['distance'] / 1000
+    df['distance_m'] = df['distance']  # Garder aussi en mètres pour les calculs
     df['elevation_gain_m'] = df['total_elevation_gain']
     df['duration_hours'] = df['moving_time'] / 3600
     df['speed_kmh'] = df['average_speed'] * 3.6
     
-    # Calcul du pourcentage de D+
-    df['deniv_percent'] = (df['elevation_gain_m'] / df['distance_km'] * 100).round(1)
+    # Calcul du pourcentage de D+ : (D+ en m) / (Distance en m) * 100
+    df['deniv_percent'] = (df['elevation_gain_m'] / df['distance_m'] * 100).round(1)
     
     # Filtre sur les activités de course/trail
     run_types = ['Run', 'TrailRun', 'Trail']
@@ -288,15 +289,38 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("🎯 Distribution des distances")
     
-    fig = px.histogram(
-        df,
-        x='distance_km',
-        nbins=20,
-        labels={'distance_km': 'Distance (km)', 'count': 'Nombre de sorties'},
-        color_discrete_sequence=['#FC4C02']
+    # Créer des catégories de distance
+    bins = [0, 5, 10, 15, 20, 25, 30, 40, 50, 100]
+    labels = ['0-5km', '5-10km', '10-15km', '15-20km', '20-25km', '25-30km', '30-40km', '40-50km', '50km+']
+    
+    df_temp = df.copy()
+    df_temp['distance_category'] = pd.cut(df_temp['distance_km'], bins=bins, labels=labels, right=False)
+    
+    # Compter par catégorie
+    distance_counts = df_temp['distance_category'].value_counts().sort_index()
+    
+    fig = go.Figure()
+    fig.add_trace(go.Pie(
+        labels=distance_counts.index.astype(str),
+        values=distance_counts.values,
+        hole=0.3,  # Donut chart
+        marker=dict(colors=px.colors.sequential.Oranges_r),
+        textinfo='label+percent',
+        textposition='auto'
+    ))
+    
+    fig.update_layout(
+        height=350,
+        showlegend=True,
+        legend=dict(
+            orientation="v",
+            yanchor="middle",
+            y=0.5,
+            xanchor="left",
+            x=1.02
+        )
     )
     
-    fig.update_layout(height=350, showlegend=False)
     st.plotly_chart(fig, use_container_width=True)
 
 with col2:
@@ -310,7 +334,7 @@ with col2:
         hover_data=['name', 'start_date'],
         labels={
             'distance_km': 'Distance (km)',
-            'deniv_percent': '% D+',
+            'deniv_percent': '% D+ (m/m)',
             'elevation_gain_m': 'D+ (m)'
         },
         color_discrete_sequence=['#00A8E8']

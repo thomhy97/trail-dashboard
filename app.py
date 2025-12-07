@@ -5,9 +5,6 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import requests
 
-# Import des pages
-from pages import show_training_load_page, show_activity_detail_page
-
 # Configuration de la page
 st.set_page_config(
     page_title="Trail Training Dashboard",
@@ -157,16 +154,6 @@ with st.sidebar:
     
     st.divider()
     
-    # Navigation
-    st.subheader("📍 Navigation")
-    page = st.radio(
-        "Aller à",
-        ["🏠 Vue d'ensemble", "⚡ Charge d'entraînement", "🔍 Analyse détaillée"],
-        label_visibility="collapsed"
-    )
-    
-    st.divider()
-    
     # Filtres temporels
     st.subheader("📅 Période")
     time_range = st.selectbox(
@@ -205,12 +192,16 @@ if df.empty:
     st.warning("Aucune activité trouvée pour cette période")
     st.stop()
 
-# Routing des pages
-if page == "🏠 Vue d'ensemble":
-    # Page d'accueil (code original)
-    
-    # Métriques principales
-    st.header("📊 Vue d'ensemble")
+# Stockage des données dans session_state pour les autres pages
+st.session_state.df = df
+st.session_state.after_date = after_date
+
+# Page d'accueil - Vue d'ensemble
+# Les autres pages (Charge d'entraînement, Analyse détaillée) sont dans le dossier pages/
+# et sont automatiquement détectées par Streamlit
+
+# Métriques principales
+st.header("📊 Vue d'ensemble")
 
     col1, col2, col3, col4, col5 = st.columns(5)
 
@@ -344,16 +335,6 @@ if page == "🏠 Vue d'ensemble":
     display_df = display_df.sort_values('Date', ascending=False).head(15)
 
     st.dataframe(display_df, use_container_width=True, hide_index=True)
-
-elif page == "⚡ Charge d'entraînement":
-    # Import et affichage de la page de charge
-    from pages.charge_entrainement import show_training_load_page
-    show_training_load_page(df)
-
-elif page == "🔍 Analyse détaillée":
-    # Import et affichage de la page d'analyse détaillée
-    from pages.analyse_detaillee import show_activity_detail_page
-    show_activity_detail_page(df, st.session_state.access_token)
 
 # Footer
 st.divider()

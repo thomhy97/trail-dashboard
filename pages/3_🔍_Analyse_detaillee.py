@@ -9,18 +9,27 @@ sys.path.append('..')
 
 from utils.activity_analysis import ActivityAnalyzer, get_similar_activities
 
+st.set_page_config(
+    page_title="Analyse détaillée",
+    page_icon="🔍",
+    layout="wide"
+)
 
-def show_activity_detail_page(df, access_token):
-    """
-    Page d'analyse détaillée d'une sortie
-    
-    Args:
-        df: DataFrame des activités
-        access_token: Token Strava
-    """
-    st.header("🔍 Analyse détaillée des sorties")
-    
-    if df.empty:
+# Vérifier que l'utilisateur est connecté et a des données
+if 'access_token' not in st.session_state or not st.session_state.access_token:
+    st.error("⚠️ Tu dois d'abord te connecter à Strava depuis la page d'accueil")
+    st.stop()
+
+if 'df' not in st.session_state or st.session_state.df.empty:
+    st.error("⚠️ Aucune donnée disponible. Va d'abord sur la page d'accueil.")
+    st.stop()
+
+df = st.session_state.df
+access_token = st.session_state.access_token
+
+st.header("🔍 Analyse détaillée des sorties")
+
+if df.empty:
         st.warning("Aucune activité disponible")
         return
     
@@ -361,10 +370,3 @@ def show_activity_detail_page(df, access_token):
                 )
     else:
         st.info("Aucune sortie similaire trouvée avec ces critères")
-
-
-if __name__ == "__main__":
-    st.set_page_config(page_title="Analyse détaillée", page_icon="🔍", layout="wide")
-    
-    st.title("🔍 Analyse détaillée des sorties")
-    st.info("Cette page nécessite des données d'activités et un token Strava")

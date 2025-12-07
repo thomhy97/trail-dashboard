@@ -15,18 +15,27 @@ from utils.training_load import (
     add_training_load_metrics
 )
 
+st.set_page_config(
+    page_title="Charge d'entraînement",
+    page_icon="⚡",
+    layout="wide"
+)
 
-def show_training_load_page(df):
-    """
-    Page principale d'analyse de charge d'entraînement
-    
-    Args:
-        df: DataFrame des activités avec métriques de base
-    """
-    st.header("⚡ Charge d'entraînement")
-    
-    # Configuration personnalisée
-    with st.sidebar:
+# Vérifier que l'utilisateur est connecté et a des données
+if 'access_token' not in st.session_state or not st.session_state.access_token:
+    st.error("⚠️ Tu dois d'abord te connecter à Strava depuis la page d'accueil")
+    st.stop()
+
+if 'df' not in st.session_state or st.session_state.df.empty:
+    st.error("⚠️ Aucune donnée disponible. Va d'abord sur la page d'accueil.")
+    st.stop()
+
+df = st.session_state.df
+
+st.header("⚡ Charge d'entraînement")
+
+# Configuration personnalisée
+with st.sidebar:
         st.subheader("⚙️ Configuration")
         
         fc_max = st.number_input(
@@ -358,11 +367,3 @@ def show_training_load_page(df):
     display_df = display_df.sort_values('Date', ascending=False).head(10)
     
     st.dataframe(display_df, use_container_width=True, hide_index=True)
-
-
-if __name__ == "__main__":
-    st.set_page_config(page_title="Charge d'entraînement", page_icon="⚡", layout="wide")
-    
-    # Pour tester localement
-    st.title("⚡ Analyse de charge d'entraînement")
-    st.info("Cette page nécessite des données d'activités pour fonctionner")

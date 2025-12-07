@@ -99,7 +99,7 @@ def process_activities(activities):
     df = df[[col for col in columns_to_keep if col in df.columns]]
     
     # Conversion des types
-    df['start_date'] = pd.to_datetime(df['start_date'])
+    df['start_date'] = pd.to_datetime(df['start_date']).dt.tz_localize(None)  # Retirer le timezone
     df['distance_km'] = df['distance'] / 1000
     df['elevation_gain_m'] = df['total_elevation_gain']
     df['duration_hours'] = df['moving_time'] / 3600

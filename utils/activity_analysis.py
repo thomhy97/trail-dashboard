@@ -235,9 +235,14 @@ class ActivityAnalyzer:
             fig.add_trace(go.Scattermapbox(
                 lat=lats,
                 lon=lons,
-                mode='lines',
-                line=dict(width=3, color=color_data, colorscale='Viridis'),
-                marker=dict(size=5, colorbar=dict(title=color_label)),
+                mode='markers',
+                marker=dict(
+                    size=8,
+                    color=color_data,
+                    colorscale='Viridis',
+                    showscale=True,
+                    colorbar=dict(title=color_label)
+                ),
                 hovertemplate='<b>Lat</b>: %{lat:.5f}<br>' +
                               '<b>Lon</b>: %{lon:.5f}<br>' +
                               f'<b>{color_label}</b>: %{{marker.color:.1f}}<br>' +

@@ -42,7 +42,9 @@ df_display['display_name'] = (
     df_display['start_date'].dt.strftime('%Y-%m-%d') + 
     " - " + 
     df_display['name'] + 
-    f" ({df_display['distance_km']:.1f} km, {df_display['elevation_gain_m']:.0f}m D+)"
+    " (" + 
+    df_display['distance_km'].apply(lambda x: f"{x:.1f}") + " km, " +
+    df_display['elevation_gain_m'].apply(lambda x: f"{x:.0f}") + "m D+)"
 )
 
 # Sélecteur

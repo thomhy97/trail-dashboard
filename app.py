@@ -203,138 +203,138 @@ st.session_state.after_date = after_date
 # Métriques principales
 st.header("📊 Vue d'ensemble")
 
-    col1, col2, col3, col4, col5 = st.columns(5)
+col1, col2, col3, col4, col5 = st.columns(5)
 
-    with col1:
-        total_runs = len(df)
-        st.metric("Sorties", f"{total_runs}")
+with col1:
+    total_runs = len(df)
+    st.metric("Sorties", f"{total_runs}")
 
-    with col2:
-        total_distance = df['distance_km'].sum()
-        st.metric("Distance totale", f"{total_distance:.0f} km")
+with col2:
+    total_distance = df['distance_km'].sum()
+    st.metric("Distance totale", f"{total_distance:.0f} km")
 
-    with col3:
-        total_elevation = df['elevation_gain_m'].sum()
-        st.metric("D+ total", f"{total_elevation:.0f} m")
+with col3:
+    total_elevation = df['elevation_gain_m'].sum()
+    st.metric("D+ total", f"{total_elevation:.0f} m")
 
-    with col4:
-        avg_distance = df['distance_km'].mean()
-        st.metric("Distance moy.", f"{avg_distance:.1f} km")
+with col4:
+    avg_distance = df['distance_km'].mean()
+    st.metric("Distance moy.", f"{avg_distance:.1f} km")
 
-    with col5:
-        total_time = df['duration_hours'].sum()
-        st.metric("Temps total", f"{total_time:.0f}h")
+with col5:
+    total_time = df['duration_hours'].sum()
+    st.metric("Temps total", f"{total_time:.0f}h")
 
-    st.divider()
+st.divider()
 
-    # Graphiques
-    col1, col2 = st.columns(2)
+# Graphiques
+col1, col2 = st.columns(2)
 
-    with col1:
-        st.subheader("📈 Évolution hebdomadaire")
-        
-        # Regroupement par semaine
-        df_weekly = df.copy()
-        df_weekly['week'] = df_weekly['start_date'].dt.to_period('W').astype(str)
-        
-        weekly_stats = df_weekly.groupby('week').agg({
-            'distance_km': 'sum',
-            'elevation_gain_m': 'sum',
-            'duration_hours': 'sum'
-        }).reset_index()
-        
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=weekly_stats['week'],
-            y=weekly_stats['distance_km'],
-            name='Distance (km)',
-            marker_color='#FC4C02'
-        ))
-        
-        fig.update_layout(
-            height=400,
-            xaxis_title="Semaine",
-            yaxis_title="Distance (km)",
-            showlegend=False
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
+with col1:
+    st.subheader("📈 Évolution hebdomadaire")
+    
+    # Regroupement par semaine
+    df_weekly = df.copy()
+    df_weekly['week'] = df_weekly['start_date'].dt.to_period('W').astype(str)
+    
+    weekly_stats = df_weekly.groupby('week').agg({
+        'distance_km': 'sum',
+        'elevation_gain_m': 'sum',
+        'duration_hours': 'sum'
+    }).reset_index()
+    
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=weekly_stats['week'],
+        y=weekly_stats['distance_km'],
+        name='Distance (km)',
+        marker_color='#FC4C02'
+    ))
+    
+    fig.update_layout(
+        height=400,
+        xaxis_title="Semaine",
+        yaxis_title="Distance (km)",
+        showlegend=False
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
 
-    with col2:
-        st.subheader("⛰️ D+ hebdomadaire")
-        
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=weekly_stats['week'],
-            y=weekly_stats['elevation_gain_m'],
-            name='D+ (m)',
-            marker_color='#00A8E8'
-        ))
-        
-        fig.update_layout(
-            height=400,
-            xaxis_title="Semaine",
-            yaxis_title="Dénivelé (m)",
-            showlegend=False
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
+with col2:
+    st.subheader("⛰️ D+ hebdomadaire")
+    
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=weekly_stats['week'],
+        y=weekly_stats['elevation_gain_m'],
+        name='D+ (m)',
+        marker_color='#00A8E8'
+    ))
+    
+    fig.update_layout(
+        height=400,
+        xaxis_title="Semaine",
+        yaxis_title="Dénivelé (m)",
+        showlegend=False
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
 
-    st.divider()
+st.divider()
 
-    # Analyses détaillées
-    col1, col2 = st.columns(2)
+# Analyses détaillées
+col1, col2 = st.columns(2)
 
-    with col1:
-        st.subheader("🎯 Distribution des distances")
-        
-        fig = px.histogram(
-            df,
-            x='distance_km',
-            nbins=20,
-            labels={'distance_km': 'Distance (km)', 'count': 'Nombre de sorties'},
-            color_discrete_sequence=['#FC4C02']
-        )
-        
-        fig.update_layout(height=350, showlegend=False)
-        st.plotly_chart(fig, use_container_width=True)
+with col1:
+    st.subheader("🎯 Distribution des distances")
+    
+    fig = px.histogram(
+        df,
+        x='distance_km',
+        nbins=20,
+        labels={'distance_km': 'Distance (km)', 'count': 'Nombre de sorties'},
+        color_discrete_sequence=['#FC4C02']
+    )
+    
+    fig.update_layout(height=350, showlegend=False)
+    st.plotly_chart(fig, use_container_width=True)
 
-    with col2:
-        st.subheader("📐 % de D+ par sortie")
-        
-        fig = px.scatter(
-            df,
-            x='distance_km',
-            y='deniv_percent',
-            size='elevation_gain_m',
-            hover_data=['name', 'start_date'],
-            labels={
-                'distance_km': 'Distance (km)',
-                'deniv_percent': '% D+',
-                'elevation_gain_m': 'D+ (m)'
-            },
-            color_discrete_sequence=['#00A8E8']
-        )
-        
-        fig.update_layout(height=350)
-        st.plotly_chart(fig, use_container_width=True)
+with col2:
+    st.subheader("📐 % de D+ par sortie")
+    
+    fig = px.scatter(
+        df,
+        x='distance_km',
+        y='deniv_percent',
+        size='elevation_gain_m',
+        hover_data=['name', 'start_date'],
+        labels={
+            'distance_km': 'Distance (km)',
+            'deniv_percent': '% D+',
+            'elevation_gain_m': 'D+ (m)'
+        },
+        color_discrete_sequence=['#00A8E8']
+    )
+    
+    fig.update_layout(height=350)
+    st.plotly_chart(fig, use_container_width=True)
 
-    st.divider()
+st.divider()
 
-    # Tableau des dernières activités
-    st.subheader("🏃 Dernières sorties")
+# Tableau des dernières activités
+st.subheader("🏃 Dernières sorties")
 
-    display_df = df[['start_date', 'name', 'distance_km', 'elevation_gain_m', 
-                     'duration_hours', 'speed_kmh', 'deniv_percent']].copy()
+display_df = df[['start_date', 'name', 'distance_km', 'elevation_gain_m', 
+                 'duration_hours', 'speed_kmh', 'deniv_percent']].copy()
 
-    display_df.columns = ['Date', 'Nom', 'Distance (km)', 'D+ (m)', 
-                          'Durée (h)', 'Vitesse (km/h)', '% D+']
+display_df.columns = ['Date', 'Nom', 'Distance (km)', 'D+ (m)', 
+                      'Durée (h)', 'Vitesse (km/h)', '% D+']
 
-    display_df['Date'] = display_df['Date'].dt.strftime('%Y-%m-%d')
-    display_df = display_df.round(2)
-    display_df = display_df.sort_values('Date', ascending=False).head(15)
+display_df['Date'] = display_df['Date'].dt.strftime('%Y-%m-%d')
+display_df = display_df.round(2)
+display_df = display_df.sort_values('Date', ascending=False).head(15)
 
-    st.dataframe(display_df, use_container_width=True, hide_index=True)
+st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 # Footer
 st.divider()

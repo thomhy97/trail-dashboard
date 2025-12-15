@@ -4,6 +4,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import requests
+import os
+from database import SupabaseDB
 
 # Configuration de la page
 st.set_page_config(
@@ -13,10 +15,37 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Initialiser le client Supabase (optionnel)
+@st.cache_resource
+def init_database():
+    """Initialise la connexion à Supabase (une seule fois)"""
+    try:
+        # Vérifier si les clés Supabase sont présentes
+        if "SUPABASE_URL" not in st.secrets or "SUPABASE_KEY" not in st.secrets:
+            return None
+        
+        # Configurer les variables d'environnement depuis secrets
+        os.environ['SUPABASE_URL'] = st.secrets["SUPABASE_URL"]
+        os.environ['SUPABASE_KEY'] = st.secrets["SUPABASE_KEY"]
+        return SupabaseDB()
+    except Exception as e:
+        return None
+
+# Initialiser la base de données
+db = init_database()
+
+# Afficher le status Supabase une seule fois
+if 'supabase_status_shown' not in st.session_state:
+    st.session_state.supabase_status_shown = True
+    if db is None:
+        st.info("ℹ️ Mode sans cache DB (Supabase non configuré). L'app fonctionne normalement.", icon="ℹ️")
+    else:
+        st.success("✅ Cache DB activé (Supabase connecté)", icon="✅")
+
 # Fonction pour gérer l'authentification Strava
 def get_strava_auth_url():
-    client_id = st.secrets["strava"]["client_id"]
-    redirect_uri = st.secrets["strava"]["redirect_uri"]
+    client_id = st.secrets["STRAVA_CLIENT_ID"]
+    redirect_uri = st.secrets.get("STRAVA_REDIRECT_URI", "http://localhost:8501")
     scope = "activity:read_all"
     return f"https://www.strava.com/oauth/authorize?client_id={client_id}&response_type=code&redirect_uri={redirect_uri}&approval_prompt=force&scope={scope}"
 
@@ -25,26 +54,58 @@ def exchange_token(code):
     response = requests.post(
         "https://www.strava.com/oauth/token",
         data={
-            "client_id": st.secrets["strava"]["client_id"],
-            "client_secret": st.secrets["strava"]["client_secret"],
+            "client_id": st.secrets["STRAVA_CLIENT_ID"],
+            "client_secret": st.secrets["STRAVA_CLIENT_SECRET"],
             "code": code,
             "grant_type": "authorization_code"
         }
     )
-    return response.json()
+    token_data = response.json()
+    
+    # Sauvegarder l'utilisateur et les tokens en DB (si Supabase disponible)
+    if db and 'athlete' in token_data and 'access_token' in token_data:
+        athlete = token_data['athlete']
+        strava_id = str(athlete['id'])
+        
+        # Créer/mettre à jour l'utilisateur
+        db.create_or_update_user(strava_id, athlete)
+        
+        # Sauvegarder les tokens
+        db.save_strava_token(
+            strava_id,
+            token_data['access_token'],
+            token_data['refresh_token'],
+            token_data['expires_at']
+        )
+        
+        # Sauvegarder l'ID utilisateur en session
+        st.session_state.strava_id = strava_id
+    
+    return token_data
 
-def refresh_access_token(refresh_token):
-    """Rafraîchit le token d'accès"""
+def refresh_access_token(refresh_token, strava_id=None):
+    """Rafraîchit le token d'accès et met à jour la DB"""
     response = requests.post(
         "https://www.strava.com/oauth/token",
         data={
-            "client_id": st.secrets["strava"]["client_id"],
-            "client_secret": st.secrets["strava"]["client_secret"],
+            "client_id": st.secrets["STRAVA_CLIENT_ID"],
+            "client_secret": st.secrets["STRAVA_CLIENT_SECRET"],
             "refresh_token": refresh_token,
             "grant_type": "refresh_token"
         }
     )
-    return response.json()
+    token_data = response.json()
+    
+    # Mettre à jour les tokens en DB (si disponible)
+    if db and strava_id and 'access_token' in token_data:
+        db.save_strava_token(
+            strava_id,
+            token_data['access_token'],
+            token_data['refresh_token'],
+            token_data['expires_at']
+        )
+    
+    return token_data
 
 def get_activities(access_token, after_timestamp=None, per_page=200):
     """Récupère les activités depuis Strava"""
@@ -119,19 +180,25 @@ def process_activities(activities):
 st.title("🏔️ Trail Training Dashboard V2")
 st.markdown("### Suivi d'entraînement avancé pour objectifs 2026")
 
-# Gestion de l'authentification
+# Gestion de l'authentification avec cache DB
 if 'access_token' not in st.session_state:
     st.session_state.access_token = None
     st.session_state.refresh_token = None
+    st.session_state.strava_id = None
 
 # Vérification du code d'autorisation dans l'URL
 query_params = st.query_params
 if 'code' in query_params and not st.session_state.access_token:
     with st.spinner("Connexion à Strava..."):
         token_data = exchange_token(query_params['code'])
-        st.session_state.access_token = token_data.get('access_token')
-        st.session_state.refresh_token = token_data.get('refresh_token')
-        st.rerun()
+        if 'access_token' in token_data:
+            st.session_state.access_token = token_data.get('access_token')
+            st.session_state.refresh_token = token_data.get('refresh_token')
+            st.success("✅ Connecté avec succès !")
+            st.rerun()
+        else:
+            st.error("❌ Erreur de connexion Strava")
+            st.stop()
 
 # Sidebar pour l'authentification et les filtres
 with st.sidebar:
@@ -143,15 +210,36 @@ with st.sidebar:
         st.markdown(f"[🔗 Se connecter à Strava]({auth_url})")
         st.stop()
     else:
-        st.success("✅ Connecté à Strava")
-        if st.button("🔄 Rafraîchir les données"):
-            st.cache_data.clear()
-            st.rerun()
+        # Afficher l'utilisateur connecté (si DB disponible)
+        if db and st.session_state.strava_id:
+            user = db.get_user(st.session_state.strava_id)
+            if user:
+                col_avatar, col_name = st.columns([1, 3])
+                with col_avatar:
+                    if user.get('avatar_url'):
+                        st.image(user['avatar_url'], width=50)
+                with col_name:
+                    st.markdown(f"**{user['name']}**")
+                    st.caption("Connecté")
+            else:
+                st.success("✅ Connecté à Strava")
+        else:
+            st.success("✅ Connecté à Strava")
         
-        if st.button("🚪 Se déconnecter"):
-            st.session_state.access_token = None
-            st.session_state.refresh_token = None
-            st.rerun()
+        col_refresh, col_logout = st.columns(2)
+        
+        with col_refresh:
+            if st.button("🔄 Rafraîchir", use_container_width=True):
+                # Invalider le cache pour cet utilisateur
+                st.cache_data.clear()
+                st.rerun()
+        
+        with col_logout:
+            if st.button("🚪 Déconnexion", use_container_width=True):
+                st.session_state.access_token = None
+                st.session_state.refresh_token = None
+                st.session_state.strava_id = None
+                st.rerun()
     
     st.divider()
     
@@ -178,16 +266,48 @@ with st.sidebar:
     else:
         after_date = None
 
-# Cache des données pour éviter trop d'appels API
-@st.cache_data(ttl=3600)
-def load_strava_data(access_token, after_timestamp):
+# Fonction pour charger les données avec cache DB (si disponible)
+def load_strava_data_with_cache(access_token, strava_id, after_timestamp):
+    """Charge les activités depuis le cache DB ou Strava API"""
+    
+    # Si Supabase disponible, essayer le cache
+    if db and strava_id:
+        # 1. Essayer de charger depuis le cache DB
+        cached_activities = db.get_strava_activities(strava_id)
+        
+        if cached_activities is not None:
+            st.info("⚡ Données chargées depuis le cache (1h de validité)")
+            df = process_activities(cached_activities)
+            return df
+    
+    # 2. Cache expiré/inexistant ou pas de DB → appel API Strava
+    if db and strava_id:
+        st.info("🔄 Récupération des données depuis Strava...")
+    
     activities = get_activities(access_token, after_timestamp)
+    
+    # 3. Sauvegarder en cache si DB disponible
+    if db and strava_id and activities:
+        db.save_strava_activities(strava_id, activities)
+        st.success("✅ Données mises en cache")
+    
     return process_activities(activities)
 
 # Chargement des données
 with st.spinner("Chargement des activités..."):
     after_timestamp = after_date.timestamp() if after_date else None
-    df = load_strava_data(st.session_state.access_token, after_timestamp)
+    
+    # Vérifier si on a un strava_id
+    if st.session_state.strava_id:
+        df = load_strava_data_with_cache(
+            st.session_state.access_token, 
+            st.session_state.strava_id,
+            after_timestamp
+        )
+    else:
+        # Fallback sans cache si pas de strava_id
+        activities = get_activities(st.session_state.access_token, after_timestamp)
+        df = process_activities(activities)
 
 if df.empty:
     st.warning("Aucune activité trouvée pour cette période")
